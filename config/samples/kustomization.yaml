@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- karpenter_v1alpha1_pvenodeimage.yaml
+- karpenter_v1alpha1_pvenodeclass.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

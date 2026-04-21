@@ -1,0 +1,9 @@
+apiVersion: karpenter.algo7.dev/v1alpha1
+kind: PVENodeImage
+metadata:
+  labels:
+    app.kubernetes.io/name: karpenter-provider-pve
+    app.kubernetes.io/managed-by: kustomize
+  name: pvenodeimage-sample
+spec:
+  # TODO(user): Add fields here
