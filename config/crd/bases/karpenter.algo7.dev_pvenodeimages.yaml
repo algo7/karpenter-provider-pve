@@ -8,16 +8,36 @@ metadata:
 spec:
   group: karpenter.algo7.dev
   names:
+    categories:
+    - karpenter
     kind: PVENodeImage
     listKind: PVENodeImageList
     plural: pvenodeimages
+    shortNames:
+    - pni
     singular: pvenodeimage
-  scope: Namespaced
+  scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.distribution.type
+      name: Distribution
+      type: string
+    - jsonPath: .spec.distribution.version
+      name: Version
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.templateVMID
+      name: VMID
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: PVENodeImage is the Schema for the pvenodeimages API
+        description: PVENodeImage is the Schema for the pvenodeimages API.
         properties:
           apiVersion:
             description: |-
@@ -37,27 +57,131 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of PVENodeImage
+            description: spec defines the desired state of PVENodeImage.
             properties:
-              foo:
-                description: foo is an example field of PVENodeImage. Edit pvenodeimage_types.go
-                  to remove/update
+              baseImage:
+                description: |-
+                  baseImage specifies the source OS image used as the starting point
+                  for the Packer build.
+                properties:
+                  checksum:
+                    description: |-
+                      checksum is the checksum of the ISO at url, either as a direct
+                      "sha256:<hex>" string or a Packer-style reference like
+                      "file:https://example.com/SHA256SUMS".
+                    type: string
+                  isoFile:
+                    description: |-
+                      isoFile is the path to a pre-uploaded ISO in Proxmox storage,
+                      formatted as "<storage>:iso/<filename>" (e.g., "local:iso/ubuntu-24.04.iso").
+                    pattern: ^[a-zA-Z0-9_-]+:iso/.+\.iso$
+                    type: string
+                  url:
+                    description: |-
+                      url is the HTTP(S) location of an OS installer ISO.
+                      When set, checksum must also be set for verification.
+                    pattern: ^https?://.+
+                    type: string
+                type: object
+                x-kubernetes-validations:
+                - message: exactly one of (url+checksum) or isoFile must be set
+                  rule: (has(self.url) && has(self.checksum) && !has(self.isoFile))
+                    || (!has(self.url) && !has(self.checksum) && has(self.isoFile))
+              buildConfig:
+                description: |-
+                  buildConfig provides per-image overrides for Proxmox build infrastructure.
+                  Empty fields inherit from the controller's configured defaults.
+                properties:
+                  bridge:
+                    description: bridge overrides the network bridge for the builder
+                      VM during installation.
+                    type: string
+                  isoStoragePool:
+                    description: |-
+                      isoStoragePool overrides the storage pool used for the installer ISO
+                      and cloud-init drives during the build.
+                    type: string
+                  node:
+                    description: node overrides the Proxmox node on which to run the
+                      build.
+                    type: string
+                  storagePool:
+                    description: storagePool overrides the storage pool for the resulting
+                      template disk.
+                    type: string
+                type: object
+              distribution:
+                description: |-
+                  distribution specifies which Kubernetes distribution to pre-stage
+                  in the built template.
+                properties:
+                  type:
+                    description: type is the distribution family.
+                    enum:
+                    - rke2
+                    - k3s
+                    type: string
+                  version:
+                    description: |-
+                      version is the distribution version, including distribution-specific
+                      suffixes. Examples: "v1.33.4+rke2r1", "v1.33.4+k3s1".
+                    pattern: ^v\d+\.\d+\.\d+.*$
+                    type: string
+                required:
+                - type
+                - version
+                type: object
+              packages:
+                description: |-
+                  packages is an optional list of additional APT packages to install
+                  during the build, beyond the defaults required for Kubernetes nodes.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              rebuildPolicy:
+                description: rebuildPolicy controls when the controller rebuilds the
+                  template.
+                properties:
+                  interval:
+                    description: |-
+                      interval is the rebuild cadence when trigger is Periodic.
+                      Ignored for other triggers.
+                    type: string
+                  trigger:
+                    default: OnSpecChange
+                    description: trigger determines what causes a rebuild.
+                    enum:
+                    - OnSpecChange
+                    - Periodic
+                    - Manual
+                    type: string
+                type: object
+              sshAuthorizedKeys:
+                description: |-
+                  sshAuthorizedKeys is an optional list of SSH public keys to inject
+                  into the default user's authorized_keys file.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              timezone:
+                default: UTC
+                description: |-
+                  timezone sets the system timezone baked into the image, in IANA format
+                  (e.g., "UTC", "Europe/Zurich", "America/New_York").
                 type: string
+            required:
+            - baseImage
+            - distribution
             type: object
           status:
-            description: status defines the observed state of PVENodeImage
+            description: status defines the observed state of PVENodeImage.
             properties:
               conditions:
                 description: |-
-                  conditions represent the current state of the PVENodeImage resource.
-                  Each condition has a unique type and reflects the status of a specific aspect of the resource.
-
-                  Standard condition types include:
-                  - "Available": the resource is fully functional
-                  - "Progressing": the resource is being created or updated
-                  - "Degraded": the resource failed to reach or maintain its desired state
-
-                  The status of each condition is one of True, False, or Unknown.
+                  conditions describe the current state of the NodeImage.
+                  Standard conditions include Ready, Building, and BuildFailed.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -116,6 +240,26 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              lastBuildTime:
+                description: lastBuildTime records when the current template was built.
+                format: date-time
+                type: string
+              observedSpecHash:
+                description: |-
+                  observedSpecHash is a hash of the spec fields that affect the built
+                  template. A mismatch between this value and the current spec hash
+                  indicates a rebuild is needed.
+                type: string
+              templateNode:
+                description: templateNode is the Proxmox node where the current template
+                  lives.
+                type: string
+              templateVMID:
+                description: |-
+                  templateVMID is the Proxmox VMID of the currently available template.
+                  Unset until the first successful build completes.
+                format: int32
+                type: integer
             type: object
         required:
         - spec
