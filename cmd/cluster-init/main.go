@@ -44,6 +44,13 @@ iso_storage_pool = "local"
 # Disk
 # ──────────────────────────────────────────────────────────────────────────────
 disk_format = "qcow2"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Network - for VM network access during build. This should be a bridge with internet access,
+# but it doesn't have to be the same one used by the final cluster VMs.
+# ──────────────────────────────────────────────────────────────────────────────
+network_bridge = "vmbr0"
+network_vlan_tag = "20" # or leave blank for untagged
 `
 
 func main() {

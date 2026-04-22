@@ -23,9 +23,10 @@ source "proxmox-iso" "default" {
 
   # VM configuration
   ## Hardware
-  memory   = 8192
+  ## See: https://docs.rke2.io/install/requirements
+  memory   = 4096
   cores    = 2
-  sockets  = 2
+  sockets  = 1
   cpu_type = "x86-64-v2-AES"
   disks {
     type         = "scsi"
@@ -48,8 +49,8 @@ source "proxmox-iso" "default" {
   ## Network
   network_adapters {
     model    = "virtio"
-    bridge   = "vmbr1"
-    vlan_tag = 20
+    bridge   = var.network_bridge
+    vlan_tag = var.network_vlan_tag
     firewall = true
   }
 

@@ -60,3 +60,14 @@ variable "disk_format" {
   type    = string
   default = "qcow2"
 }
+
+
+variable "network_bridge" {
+  type    = string
+  description = "Proxmox network bridge to attach VM to."
+}
+
+variable "network_vlan_tag" {
+  type    = number
+  description = "VLAN tag for the network bridge."
+}
