@@ -32,11 +32,13 @@ cloud_init_storage_pool = "local-lvm"
 # Boot ISO — provide EITHER iso_file OR (iso_url + iso_checksum), not both.
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Option 1: pre-uploaded ISO on the Proxmox node.
-# iso_file = "local:iso/ubuntu-24.04-live-server-amd64.iso"
+# Option 1: path to pre-uploaded ISO on the Proxmox node.
+iso_file = "local:iso/ubuntu-24.04-live-server-amd64.iso"
 
 # Option 2: ISO downloaded by Packer at build time.
 iso_url          = "https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso"
+## iso_checksum can be a raw SHA256 hash or a URL with "file:" prefix pointing to a file containing the hash.
+## it can also be set to "none" to skip checksum verification, but that's not recommended.
 iso_checksum     = "file:https://releases.ubuntu.com/24.04/SHA256SUMS"
 iso_storage_pool = "local"
 
@@ -70,26 +72,27 @@ func main() {
 // newInitCmd returns the `init` subcommand, which emits a config template
 // either to stdout or to a file via -o.
 func newInitCmd() *cobra.Command {
-	var outPath string
+	var outPutName string
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Emit a config file template to stdout or -o <path>. When using -o, please make sure the file has the extension of pkrvars.hcl",
+		Short: "Emit a config file template to stdout or -o <file_name>. When using -o, `.pkrvars.hcl` is automatically appended",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if outPath == "" {
+			if outPutName == "" {
 				_, err := fmt.Fprint(os.Stdout, configTemplate)
 				return err
 			}
-
-			if err := os.WriteFile(outPath, []byte(configTemplate), 0o600); err != nil {
+			// Automatically append .pkrvars.hcl
+			outPutNameWithExt := fmt.Sprintf("%s.pkrvars.hcl", outPutName)
+			if err := os.WriteFile(outPutNameWithExt, []byte(configTemplate), 0o600); err != nil {
 				return fmt.Errorf("write config template: %w", err)
 			}
-			fmt.Fprintf(os.Stderr, "Wrote config template to %s\n", outPath)
+			fmt.Fprintf(os.Stderr, "Wrote config template to %s\n", outPutNameWithExt)
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVarP(&outPath, "output", "o", "", "write template to file instead of stdout")
+	cmd.Flags().StringVarP(&outPutName, "output", "o", "", "write template to file instead of stdout (optional, .pkrvars.hcl automatically appended)")
 	return cmd
 }
 

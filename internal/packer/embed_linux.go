@@ -10,7 +10,8 @@ import "embed"
 var packerBinaries embed.FS
 
 const (
-	packerName    = "packer_linux_amd64"
-	pluginName    = "packer-plugin-proxmox_linux_amd64"
-	pluginVersion = "1.2.3"
+	packerName = "packer_linux_amd64"
+	pluginName = "packer-plugin-proxmox_linux_amd64"
 )
+
+var pluginVersion = "unknown"

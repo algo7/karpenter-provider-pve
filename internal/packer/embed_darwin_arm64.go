@@ -10,7 +10,8 @@ import "embed"
 var packerBinaries embed.FS
 
 const (
-	packerName    = "packer_darwin_arm64"
-	pluginName    = "packer-plugin-proxmox_darwin_arm64"
-	pluginVersion = "1.2.3"
+	packerName = "packer_darwin_arm64"
+	pluginName = "packer-plugin-proxmox_darwin_arm64"
 )
+
+var pluginVersion = "unknown"

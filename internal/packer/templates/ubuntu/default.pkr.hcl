@@ -11,6 +11,7 @@ source "proxmox-iso" "default" {
     iso_url                  = var.iso_url
     iso_checksum             = var.iso_checksum
     iso_file     = var.iso_file
+    iso_storage_pool = var.iso_storage_pool
     unmount = true
   }
 

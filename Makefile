@@ -148,7 +148,10 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 
 .PHONY: build-cluster-init
 build-cluster-init: sync-packer fmt vet ## Build cluster-init binary.
-	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/cluster-init cmd/cluster-init/main.go
+	CGO_ENABLED=0 go build -trimpath \
+	-ldflags="-s -w \
+	-X 'github.com/algo7/karpenter-provider-pve/internal/packer.pluginVersion=${PACKER_PLUGIN_VER}' \
+	" -o bin/cluster-init cmd/cluster-init/main.go
 
 
 ##@ Deployment
@@ -263,7 +266,7 @@ endef
 
 # Versions
 PACKER_VER    ?= 1.15.1
-PLUGIN_VER    ?= 1.2.3
+PACKER_PLUGIN_VER    ?= 1.2.3
 
 # Directory Config
 PACKER_BIN_DIR ?= internal/packer/bin
@@ -291,9 +294,9 @@ download-packer-%: $(PACKER_BIN_DIR)
 	curl -L "https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_$(PLATFORM).zip" -o p_$(PLATFORM).zip
 	unzip -o p_$(PLATFORM).zip packer && mv packer $(PACKER_BIN_DIR)/packer_$(PLATFORM) && rm p_$(PLATFORM).zip
 
-	@echo "--- Downloading Proxmox Plugin $(PLUGIN_VER) [$(PLATFORM)] ---"
+	@echo "--- Downloading Proxmox Plugin $(PACKER_PLUGIN_VER) [$(PLATFORM)] ---"
 	@# Download the zip
-	curl -L "https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_$(PLATFORM).zip" -o pl_$(PLATFORM).zip
+	curl -L "https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PACKER_PLUGIN_VER)/packer-plugin-proxmox_v$(PACKER_PLUGIN_VER)_x5.0_$(PLATFORM).zip" -o pl_$(PLATFORM).zip
 	@# Extract the binary by looking for the file starting with 'packer-plugin-proxmox'
 	@# inside the zip, then pipe it to our standard naming convention.
 	BINARY_NAME=$$(unzip -l pl_$(PLATFORM).zip | awk '/packer-plugin-proxmox/ {print $$NF}' | head -n 1); \
