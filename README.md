@@ -19,4 +19,4 @@ To simplify cluster initialization, you can use the `cluster-init` tools provide
 The tool uses the packer (embedded in the `cluster-init` binary and extracted to a temporary directory) to create a VM template based on the specified Kubernetes distribution. It then configures the cluster according to the provided parameters, such as the number of control-plane nodes and the desired Kubernetes version.
 
 > [!CAUTION]
-> This project is still in early development. The controller does not work yet, and the cluster-init tools only supports Ubuntu 22.04x with VM Template creation only.
+> This project is still in early development. The controller does not work yet, and the cluster-init tools only supports Ubuntu 24.04x with VM Template creation only.
