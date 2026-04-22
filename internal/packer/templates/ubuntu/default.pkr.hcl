@@ -16,7 +16,7 @@ source "proxmox-iso" "default" {
 
 
   node         = var.node
-  vm_id        = "10005"
+  vm_id        = "9999"
   ssh_username = "ubuntu"
   ssh_password = "ubuntu"
   ssh_timeout  = "20m"

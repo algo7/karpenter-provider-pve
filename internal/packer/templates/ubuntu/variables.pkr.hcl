@@ -24,7 +24,7 @@ variable "cloud_init_storage_pool" {
 
 variable "node" {
   type = string
-  decription = "Proxmox node to create the template on."
+  description = "Proxmox node to create the template on."
 }
 
 variable "iso_storage_pool" {
@@ -50,17 +50,11 @@ variable "iso_checksum" {
   description = "Checksum for iso_url. Required when iso_url is set. Format: 'sha256:...' or 'file:<url>'."
 }
 
-variable "iso_storage_pool" {
-  type        = string
-  default     = "local"
-  description = "Proxmox storage pool for uploaded ISO. Only used with iso_url."
-}
 
 variable "disk_format" {
   type    = string
   default = "qcow2"
 }
-
 
 variable "network_bridge" {
   type    = string
