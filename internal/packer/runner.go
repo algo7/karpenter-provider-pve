@@ -16,6 +16,9 @@ import (
 // template into a temporary directory, copies the user's pkrvars file into the
 // template dir as an auto-loaded var file, and runs Packer.
 func RunPacker(templateName, userVarFile string, args []string) error {
+	fmt.Println("Running Packer with template:", templateName)
+	fmt.Println("Plese note that this can take a while as packer is configured to install all the available updates before creating the VM Template")
+
 	tmpDir, err := os.MkdirTemp("", "pve-packer-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
