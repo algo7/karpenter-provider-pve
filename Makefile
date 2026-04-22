@@ -1,6 +1,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
-
+PACKER_VER=1.15.1
+PLUGIN_VER=1.2.3
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -19,8 +20,7 @@ CONTAINER_TOOL ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-.PHONY: all
-all: build
+.PHONY: help
 
 ##@ General
 
@@ -145,6 +145,38 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KUSTOMIZE)" build config/default > dist/install.yaml
+
+
+.PHONY: sync-packer
+sync-packer: ## Download the Packer binary and Proxmox plugin into the internal/packer/bin directory.
+		@mkdir -p internal/packer/bin
+
+		# Download Linux Core
+		@curl -L https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_linux_amd64.zip -o p.zip
+		@unzip -p p.zip packer > internal/packer/bin/packer_linux_amd64 && rm p.zip
+
+		# Download Darwin Core
+		@curl -L https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_darwin_amd64.zip -o p.zip
+		@unzip -p p.zip packer > internal/packer/bin/packer_darwin_amd64 && rm p.zip
+
+		# Download Darwin arm64 Core
+		@curl -L https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_darwin_arm64.zip -o p.zip
+		@unzip -p p.zip packer > internal/packer/bin/packer_darwin_arm64 && rm p.zip
+
+		# Download Proxmox Plugin - Linux
+		@curl -L https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_linux_amd64.zip -o pl.zip
+		@unzip -p pl.zip packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_linux_amd64 > internal/packer/bin/packer-plugin-proxmox_linux_amd64 && rm pl.zip
+
+		# Download Proxmox Plugin - Darwin
+		@curl -L https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_amd64.zip -o pl.zip
+		@unzip -p pl.zip packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_amd64 > internal/packer/bin/packer-plugin-proxmox_darwin_amd64 && rm pl.zip
+
+		# Download Proxmox Plugin - Darwin arm64
+		@curl -L https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_arm64.zip -o pl.zip
+		@unzip -p pl.zip packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_arm64 > internal/packer/bin/packer-plugin-proxmox_darwin_arm64 && rm pl.zip
+
+		# Make them executable
+		@chmod +x internal/packer/bin/*
 
 ##@ Deployment
 
