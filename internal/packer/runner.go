@@ -2,19 +2,19 @@ package packer
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 // RunPacker extracts the embedded Packer binary, Proxmox plugin, and the named
-// template into a temporary directory, writes cfg as an auto-loaded var file,
-// then runs Packer against the extracted template dir. Extra args are passed
-// through (e.g. "build", "-force"). The template dir is appended as the final
-// positional argument automatically.
-func RunPacker(templateName string, cfg Config, args []string) error {
+// template into a temporary directory, copies the user's pkrvars file into the
+// template dir as an auto-loaded var file, and runs Packer. Extra args are
+// passed through (e.g. "build", "-force"). The template dir is appended as the
+// final positional argument automatically.
+func RunPacker(templateName, userVarFile string, args []string) error {
 	tmpDir, err := os.MkdirTemp("", "pve-packer-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
@@ -29,7 +29,7 @@ func RunPacker(templateName string, cfg Config, args []string) error {
 
 	// Proxmox plugin
 	pluginDir := filepath.Join(tmpDir, "plugins")
-	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create plugin dir: %w", err)
 	}
 	pluginPath := filepath.Join(pluginDir, "packer-plugin-proxmox")
@@ -44,9 +44,10 @@ func RunPacker(templateName string, cfg Config, args []string) error {
 		return fmt.Errorf("failed to extract template %q: %w", templateName, err)
 	}
 
-	// Write config as auto-loaded HCL var file
-	if err := writeVarFile(templateDir, cfg); err != nil {
-		return fmt.Errorf("failed to write var file: %w", err)
+	// Copy user's pkrvars file into the template dir with an auto-load suffix
+	dst := filepath.Join(templateDir, "user.auto.pkrvars.hcl")
+	if err := copyFile(userVarFile, dst, 0o600); err != nil {
+		return fmt.Errorf("copy user config: %w", err)
 	}
 
 	// Append template dir as final positional arg
@@ -62,14 +63,14 @@ func RunPacker(templateName string, cfg Config, args []string) error {
 	return cmd.Run()
 }
 
-// extractFile reads a single embedded file from packerBinaries and writes it to
-// targetPath with executable permissions. Intended for binaries.
+// extractFile reads a single embedded file from packerBinaries and writes it
+// to targetPath with executable permissions.
 func extractFile(targetPath, embedPath string) error {
 	data, err := packerBinaries.ReadFile(embedPath)
 	if err != nil {
 		return fmt.Errorf("failed to read embedded file %s: %w", embedPath, err)
 	}
-	return os.WriteFile(targetPath, data, 0755)
+	return os.WriteFile(targetPath, data, 0o755)
 }
 
 // extractDir walks srcDir inside packerTemplates and mirrors its contents to
@@ -87,43 +88,31 @@ func extractDir(srcDir, destDir string) error {
 		target := filepath.Join(destDir, rel)
 
 		if d.IsDir() {
-			return os.MkdirAll(target, 0755)
+			return os.MkdirAll(target, 0o755)
 		}
 
 		data, err := packerTemplates.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("read embedded %s: %w", path, err)
 		}
-		return os.WriteFile(target, data, 0644)
+		return os.WriteFile(target, data, 0o644)
 	})
 }
 
-// writeVarFile writes cfg as a Packer auto-loaded HCL var file inside
-// templateDir. Empty string fields are skipped so HCL variable defaults take
-// effect. The file has 0600 perms since it contains the API token secret.
-func writeVarFile(templateDir string, cfg Config) error {
-	pairs := []struct{ key, val string }{
-		{"proxmox_api_url", cfg.ProxmoxAPIURL},
-		{"proxmox_api_token_id", cfg.ProxmoxAPITokenID},
-		{"proxmox_api_token_secret", cfg.ProxmoxAPITokenSecret},
-		{"storage_pool", cfg.StoragePool},
-		{"cloud_init_storage_pool", cfg.CloudInitStoragePool},
-		{"node", cfg.Node},
-		{"iso_file", cfg.ISOFile},
-		{"iso_url", cfg.ISOURL},
-		{"iso_checksum", cfg.ISOChecksum},
-		{"iso_storage_pool", cfg.ISOStoragePool},
-		{"disk_format", cfg.DiskFormat},
+// copyFile copies src to dst with the given mode.
+func copyFile(src, dst string, mode os.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
 	}
+	defer in.Close()
 
-	var b strings.Builder
-	for _, p := range pairs {
-		if p.val == "" {
-			continue
-		}
-		fmt.Fprintf(&b, "%s = %q\n", p.key, p.val)
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return err
 	}
+	defer out.Close()
 
-	varFile := filepath.Join(templateDir, "config.auto.pkrvars.hcl")
-	return os.WriteFile(varFile, []byte(b.String()), 0600)
+	_, err = io.Copy(out, in)
+	return err
 }
