@@ -7,9 +7,11 @@ type Config struct {
 	ProxmoxAPITokenSecret string `json:"proxmox_api_token_secret"`
 	StoragePool           string `json:"storage_pool"`
 	CloudInitStoragePool  string `json:"cloud_init_storage_pool"`
-	ISOStoragePool        string `json:"iso_storage_pool"`
 	Node                  string `json:"node"`
 	ISOFile               string `json:"iso_file"`
+	ISOURL                string `json:"iso_url"`
+	ISOChecksum           string `json:"iso_checksum"`
+	ISOStoragePool        string `json:"iso_storage_pool"`
 	DiskFormat            string `json:"disk_format"` // Default should be "qcow2"
 }
 

@@ -1,0 +1,44 @@
+#cloud-config
+autoinstall:
+  version: 1
+  refresh-installer:
+    update: yes
+  source:
+    id: 'ubuntu-server'
+    search_driver: true
+  storage:
+    layout:
+      name: lvm
+      sizing-policy: all
+
+    swap:
+      size: 0
+  identity:
+    realname: ubuntu
+    hostname: ubuntu
+    username: ubuntu
+    password: $6$exDY1mhS4KUYCE/2$zmn9ToZwTKLhCw.b4/b.ZRTIZM30JZ4QrOQ2aOXJ8yk96xpcCof0kxKwuX1kqLG/ygbJ1f8wxED22bTL4F46P0 #ubuntu
+
+  ssh:
+    install-server: yes
+  drivers:
+    install: false
+  packages:
+    - htop
+    - qemu-guest-agent
+    - nload
+    - nala
+    - cloud-init
+    - nethogs
+    - net-tools
+    - nala
+  timezone: Etc/UTC
+  updates: all
+  shutdown: reboot
+  user-data:
+    users:
+      - name: ubuntu
+        lock_passwd: false
+        sudo: ALL=(ALL) NOPASSWD:ALL
+      - name: root
+        lock_passwd: true
