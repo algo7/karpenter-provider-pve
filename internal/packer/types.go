@@ -2,17 +2,17 @@ package packer
 
 // Config represents the variables required by the Packer proxmox-iso plugins
 type Config struct {
-	ProxmoxAPIURL         string `json:"proxmox_api_url"`
-	ProxmoxAPITokenID     string `json:"proxmox_api_token_id"`
-	ProxmoxAPITokenSecret string `json:"proxmox_api_token_secret"`
-	StoragePool           string `json:"storage_pool"`
-	CloudInitStoragePool  string `json:"cloud_init_storage_pool"`
-	Node                  string `json:"node"`
-	ISOFile               string `json:"iso_file"`
-	ISOURL                string `json:"iso_url"`
-	ISOChecksum           string `json:"iso_checksum"`
-	ISOStoragePool        string `json:"iso_storage_pool"`
-	DiskFormat            string `json:"disk_format"` // Default should be "qcow2"
+	ProxmoxAPIURL         string
+	ProxmoxAPITokenID     string
+	ProxmoxAPITokenSecret string
+	StoragePool           string
+	CloudInitStoragePool  string
+	Node                  string
+	ISOFile               string
+	ISOURL                string
+	ISOChecksum           string
+	ISOStoragePool        string
+	DiskFormat            string // Default should be "qcow2"
 }
 
 // DefaultConfig returns a config with sensible defaults
