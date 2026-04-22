@@ -17,3 +17,6 @@ Related: [karpenter-provider-proxmox][kpp] targets standard kubelet bootstrap.
 To simplify cluster initialization, you can use the `cluster-init` tools provided in this repository. These tools automate the process of setting up a supported Kubernetes distribution on Proxmox VE, including the creation of the VM template and the initial cluster configuration. The tool will not install Karpenter itself, but it will prepare the environment for you to easily deploy Karpenter and start managing your worker nodes.
 
 The tool uses the packer (embedded in the `cluster-init` binary and extracted to a temporary directory) to create a VM template based on the specified Kubernetes distribution. It then configures the cluster according to the provided parameters, such as the number of control-plane nodes and the desired Kubernetes version.
+
+> [!CAUTION]
+> This project is still in early development. The controller does not work yet, and the cluster-init tools only supports Ubuntu 22.04x with VM Template creation only.
