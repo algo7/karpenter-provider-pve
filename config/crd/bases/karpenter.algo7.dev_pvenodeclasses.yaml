@@ -8,16 +8,33 @@ metadata:
 spec:
   group: karpenter.algo7.dev
   names:
+    categories:
+    - karpenter
     kind: PVENodeClass
     listKind: PVENodeClassList
     plural: pvenodeclasses
+    shortNames:
+    - pnc
     singular: pvenodeclass
-  scope: Namespaced
+  scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.nodeImageRef.name
+      name: Image
+      type: string
+    - jsonPath: .spec.instanceTypes.length()
+      name: InstanceTypes
+      type: integer
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: PVENodeClass is the Schema for the pvenodeclasses API
+        description: PVENodeClass is the Schema for the pvenodeclasses API.
         properties:
           apiVersion:
             description: |-
@@ -37,27 +54,147 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of PVENodeClass
+            description: spec defines the desired state of PVENodeClass.
             properties:
-              foo:
-                description: foo is an example field of PVENodeClass. Edit pvenodeclass_types.go
-                  to remove/update
+              instanceTypes:
+                description: |-
+                  instanceTypes defines the set of VM shapes exposed to Karpenter's
+                  scheduler for this NodeClass. Each entry becomes a selectable
+                  instance type via the node.kubernetes.io/instance-type label.
+                items:
+                  description: |-
+                    InstanceType defines a named VM shape that maps to a Karpenter instance
+                    type. Karpenter's scheduler uses these to simulate node-addition decisions
+                    against pending pods.
+                  properties:
+                    cpu:
+                      description: cpu is the number of vCPUs for this instance type.
+                      format: int32
+                      minimum: 1
+                      type: integer
+                    diskGiB:
+                      description: |-
+                        diskGiB is the boot disk size in GiB for this instance type.
+                        Must be greater than or equal to the disk size baked into the
+                        referenced PVENodeImage, or Proxmox will reject the clone.
+                      format: int32
+                      minimum: 10
+                      type: integer
+                    memoryMiB:
+                      description: memoryMiB is the amount of RAM in MiB for this
+                        instance type.
+                      format: int32
+                      minimum: 512
+                      type: integer
+                    name:
+                      description: |-
+                        name is the instance type identifier (e.g., "small", "medium", "gpu").
+                        Surfaced to Karpenter as node.kubernetes.io/instance-type.
+                      minLength: 1
+                      pattern: ^[a-z0-9][a-z0-9-]*$
+                      type: string
+                  required:
+                  - cpu
+                  - diskGiB
+                  - memoryMiB
+                  - name
+                  type: object
+                minItems: 1
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              network:
+                description: network configures networking for cloned VMs.
+                properties:
+                  bridge:
+                    description: bridge is the Proxmox network bridge attached to
+                      cloned VMs.
+                    minLength: 1
+                    type: string
+                  firewall:
+                    default: false
+                    description: firewall enables the Proxmox firewall on the VM network
+                      interface.
+                    type: boolean
+                  vlanTag:
+                    description: vlanTag is an optional VLAN ID for the VM network
+                      interface.
+                    format: int32
+                    maximum: 4094
+                    minimum: 1
+                    type: integer
+                required:
+                - bridge
+                type: object
+              nodeImageRef:
+                description: |-
+                  nodeImageRef references the PVENodeImage used as the base template
+                  for nodes provisioned under this NodeClass. The referenced image
+                  must be cluster-scoped and reach Ready=True before nodes can be
+                  provisioned.
+                properties:
+                  name:
+                    description: name of the referenced PVENodeImage.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              placementTargets:
+                description: |-
+                  placementTargets lists Proxmox nodes available for VM placement and
+                  the Karpenter topology zone each represents. At least one entry is
+                  required; single-node Proxmox setups use a single entry.
+                items:
+                  description: PlacementTarget maps a Proxmox node to a Karpenter
+                    topology zone.
+                  properties:
+                    node:
+                      description: node is the Proxmox node name (e.g., "pve-01")
+                        where VMs may be placed.
+                      minLength: 1
+                      type: string
+                    zone:
+                      description: |-
+                        zone is the Karpenter topology.kubernetes.io/zone label value this
+                        Proxmox node represents. If empty, the node name is used as the zone.
+                      type: string
+                  required:
+                  - node
+                  type: object
+                minItems: 1
+                type: array
+                x-kubernetes-list-map-keys:
+                - node
+                x-kubernetes-list-type: map
+              storagePool:
+                description: storagePool is the Proxmox storage pool that backs cloned
+                  VM disks.
                 type: string
+              tags:
+                description: |-
+                  tags are additional Proxmox tags applied to cloned VMs. The
+                  controller always adds its own management tag for filtering during
+                  List operations; user-provided tags extend that set.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+            required:
+            - instanceTypes
+            - network
+            - nodeImageRef
+            - placementTargets
+            - storagePool
             type: object
           status:
-            description: status defines the observed state of PVENodeClass
+            description: status defines the observed state of PVENodeClass.
             properties:
               conditions:
                 description: |-
-                  conditions represent the current state of the PVENodeClass resource.
-                  Each condition has a unique type and reflects the status of a specific aspect of the resource.
-
-                  Standard condition types include:
-                  - "Available": the resource is fully functional
-                  - "Progressing": the resource is being created or updated
-                  - "Degraded": the resource failed to reach or maintain its desired state
-
-                  The status of each condition is one of True, False, or Unknown.
+                  conditions describe the current state of the NodeClass. The root
+                  Ready condition aggregates from TemplateResolved and NodeImageReady.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
