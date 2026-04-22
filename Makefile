@@ -1,7 +1,5 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
-PACKER_VER=1.15.1
-PLUGIN_VER=1.2.3
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -102,11 +100,11 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	"$(GOLANGCI_LINT)" config verify
 
-##@ Build
+##@ Build - Controller
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/controller/main.go
+	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/manager cmd/controller/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -146,37 +144,12 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KUSTOMIZE)" build config/default > dist/install.yaml
 
+##@ Build - cluster-init CLI
 
-.PHONY: sync-packer
-sync-packer: ## Download the Packer binary and Proxmox plugin into the internal/packer/bin directory.
-		@mkdir -p internal/packer/bin
+.PHONY: build-cluster-init
+build-cluster-init: sync-packer fmt vet ## Build cluster-init binary.
+	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/cluster-init cmd/cluster-init/main.go
 
-		# Download Linux Core
-		@curl -L https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_linux_amd64.zip -o p.zip
-		@unzip -p p.zip packer > internal/packer/bin/packer_linux_amd64 && rm p.zip
-
-		# Download Darwin Core
-		@curl -L https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_darwin_amd64.zip -o p.zip
-		@unzip -p p.zip packer > internal/packer/bin/packer_darwin_amd64 && rm p.zip
-
-		# Download Darwin arm64 Core
-		@curl -L https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_darwin_arm64.zip -o p.zip
-		@unzip -p p.zip packer > internal/packer/bin/packer_darwin_arm64 && rm p.zip
-
-		# Download Proxmox Plugin - Linux
-		@curl -L https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_linux_amd64.zip -o pl.zip
-		@unzip -p pl.zip packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_linux_amd64 > internal/packer/bin/packer-plugin-proxmox_linux_amd64 && rm pl.zip
-
-		# Download Proxmox Plugin - Darwin
-		@curl -L https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_amd64.zip -o pl.zip
-		@unzip -p pl.zip packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_amd64 > internal/packer/bin/packer-plugin-proxmox_darwin_amd64 && rm pl.zip
-
-		# Download Proxmox Plugin - Darwin arm64
-		@curl -L https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_arm64.zip -o pl.zip
-		@unzip -p pl.zip packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_darwin_arm64 > internal/packer/bin/packer-plugin-proxmox_darwin_arm64 && rm pl.zip
-
-		# Make them executable
-		@chmod +x internal/packer/bin/*
 
 ##@ Deployment
 
@@ -203,7 +176,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
 
-##@ Dependencies
+##@ Dependencies - Controller
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
@@ -285,3 +258,44 @@ endef
 define gomodver
 $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' $(1) 2>/dev/null)
 endef
+
+##@ Dependencies - Packer
+
+# Versions
+PACKER_VER    ?= 1.15.1
+PLUGIN_VER    ?= 1.2.3
+
+# Directory Config
+PACKER_BIN_DIR ?= internal/packer/bin
+PACKER_PLATFORMS := linux_amd64 darwin_amd64 darwin_arm64
+
+.PHONY: sync-packer
+sync-packer: $(LOCALBIN) $(PACKER_BIN_DIR) ## Download Packer and Proxmox plugin for all platforms
+	@for platform in $(PACKER_PLATFORMS); do \
+		if [ ! -f $(PACKER_BIN_DIR)/packer_$$platform ] || \
+		   [ ! -f $(PACKER_BIN_DIR)/packer-plugin-proxmox_$$platform ]; then \
+			$(MAKE) download-packer-$$platform; \
+		else \
+			echo "Packer binaries for $$platform already exist."; \
+		fi; \
+	done
+	@chmod +x $(PACKER_BIN_DIR)/*
+
+$(PACKER_BIN_DIR):
+	@mkdir -p $(PACKER_BIN_DIR)
+
+.PHONY: download-packer-%
+download-packer-%: $(PACKER_BIN_DIR)
+	$(eval PLATFORM := $*)
+	@echo "--- Downloading Packer $(PACKER_VER) [$(PLATFORM)] ---"
+	curl -L "https://releases.hashicorp.com/packer/$(PACKER_VER)/packer_$(PACKER_VER)_$(PLATFORM).zip" -o p_$(PLATFORM).zip
+	unzip -o p_$(PLATFORM).zip packer && mv packer $(PACKER_BIN_DIR)/packer_$(PLATFORM) && rm p_$(PLATFORM).zip
+
+	@echo "--- Downloading Proxmox Plugin $(PLUGIN_VER) [$(PLATFORM)] ---"
+	@# Download the zip
+	curl -L "https://github.com/hashicorp/packer-plugin-proxmox/releases/download/v$(PLUGIN_VER)/packer-plugin-proxmox_v$(PLUGIN_VER)_x5.0_$(PLATFORM).zip" -o pl_$(PLATFORM).zip
+	@# Extract the binary by looking for the file starting with 'packer-plugin-proxmox'
+	@# inside the zip, then pipe it to our standard naming convention.
+	BINARY_NAME=$$(unzip -l pl_$(PLATFORM).zip | awk '/packer-plugin-proxmox/ {print $$NF}' | head -n 1); \
+	unzip -p pl_$(PLATFORM).zip $$BINARY_NAME > $(PACKER_BIN_DIR)/packer-plugin-proxmox_$(PLATFORM)
+	@rm pl_$(PLATFORM).zip
