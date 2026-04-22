@@ -143,9 +143,11 @@ spec:
                 type: object
               placementTargets:
                 description: |-
-                  placementTargets lists Proxmox nodes available for VM placement and
-                  the Karpenter topology zone each represents. At least one entry is
-                  required; single-node Proxmox setups use a single entry.
+                  placementTargets lists the Proxmox hypervisor nodes (hosts) available
+                  for VM placement within the configured Proxmox cluster, along with the
+                  Karpenter topology.kubernetes.io/zone label each represents. At least
+                  one entry is required; single-host Proxmox (non-cluster) setups use a single entry.
+                  Multi-cluster Proxmox deployments (a Kubernetes cluster that spans across multiple Proxmox clusters) are not yet supported.
                 items:
                   description: PlacementTarget maps a Proxmox node to a Karpenter
                     topology zone.
