@@ -12,6 +12,12 @@ variable "proxmox_api_token_secret" {
   sensitive = true
 }
 
+variable "vm_id" {
+  type    = string
+  default = "9999"
+  description = "Proxmox VM ID to use for the template. Must be unique and not conflict with existing VMs. Default to 9999."
+}
+
 variable "storage_pool" {
   type    = string
   description = "Proxmox storage pool for VM disk."

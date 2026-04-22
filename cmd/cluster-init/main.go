@@ -53,6 +53,13 @@ disk_format = "qcow2"
 # ──────────────────────────────────────────────────────────────────────────────
 network_bridge = "vmbr0"
 network_vlan_tag = "20" # or leave blank for untagged
+
+# ──────────────────────────────────────────────────────────────────────────────
+# VM ID
+# ──────────────────────────────────────────────────────────────────────────────
+# ID for the Packer build VM as well as the final template. This should be an unused ID in your Proxmox cluster.
+# Default it 9999 if not set, but you can change it here by uncommenting and setting the value.
+# vm_id = 9000
 `
 
 func main() {
