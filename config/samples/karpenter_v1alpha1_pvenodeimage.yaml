@@ -4,6 +4,25 @@ metadata:
   labels:
     app.kubernetes.io/name: karpenter-provider-pve
     app.kubernetes.io/managed-by: kustomize
-  name: pvenodeimage-sample
+  name: rke2-standard
 spec:
-  # TODO(user): Add fields here
+  baseImage:
+    url: https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso
+    checksum: file:https://releases.ubuntu.com/24.04/SHA256SUMS
+  distribution:
+    type: rke2
+    version: v1.33.4+rke2r1
+  packages:
+    - qemu-guest-agent
+    - curl
+    - ca-certificates
+  sshAuthorizedKeys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyReplaceThisWithRealKey
+      user@example
+  timezone: UTC
+  buildConfig:
+    node: pve-01
+    storagePool: local-lvm
+    bridge: vmbr0
+  rebuildPolicy:
+    trigger: OnSpecChange
