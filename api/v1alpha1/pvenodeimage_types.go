@@ -65,24 +65,23 @@ type PVENodeImageSpec struct {
 	// during the build, beyond the defaults required for Kubernetes nodes.
 	// +optional
 	// +listType=set
-	Packages []string `json:"packages,omitempty"`
+	Packages []string `json:"packages,omitzero"`
 
 	// sshAuthorizedKeys is an optional list of SSH public keys to inject
 	// into the default user's authorized_keys file.
 	// +optional
 	// +listType=set
-	SSHAuthorizedKeys []string `json:"sshAuthorizedKeys,omitempty"`
+	SSHAuthorizedKeys []string `json:"sshAuthorizedKeys,omitzero"`
 
 	// timezone sets the system timezone baked into the image, in IANA format
 	// (e.g., "UTC", "Europe/Zurich", "America/New_York").
 	// +kubebuilder:default="UTC"
 	// +optional
-	Timezone string `json:"timezone,omitempty"`
+	Timezone string `json:"timezone,omitzero"`
 
-	// buildConfig provides per-image overrides for Proxmox build infrastructure.
-	// Empty fields inherit from the controller's configured defaults.
-	// +optional
-	BuildConfig BuildConfig `json:"buildConfig,omitzero"`
+	// buildConfig specifies Proxmox infrastructure for the Packer build.
+	// +required
+	BuildConfig BuildConfig `json:"buildConfig"`
 
 	// rebuildPolicy controls when the controller rebuilds the template.
 	// +optional
@@ -97,19 +96,19 @@ type BaseImage struct {
 	// When set, checksum must also be set for verification.
 	// +optional
 	// +kubebuilder:validation:Pattern=`^https?://.+`
-	URL string `json:"url,omitempty"`
+	URL string `json:"url,omitzero"`
 
 	// checksum is the checksum of the ISO at url, either as a direct
 	// "sha256:<hex>" string or a Packer-style reference like
 	// "file:https://example.com/SHA256SUMS".
 	// +optional
-	Checksum string `json:"checksum,omitempty"`
+	Checksum string `json:"checksum,omitzero"`
 
 	// isoFile is the path to a pre-uploaded ISO in Proxmox storage,
 	// formatted as "<storage>:iso/<filename>" (e.g., "local:iso/ubuntu-24.04.iso").
 	// +optional
 	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9_-]+:iso/.+\.iso$`
-	ISOFile string `json:"isoFile,omitempty"`
+	ISOFile string `json:"isoFile,omitzero"`
 }
 
 // Distribution identifies the Kubernetes distribution pre-staged in the image.
@@ -125,27 +124,25 @@ type Distribution struct {
 	Version string `json:"version"`
 }
 
-// BuildConfig specifies per-image overrides for Proxmox build infrastructure.
-// Any field left empty inherits from the controller's configured defaults.
-// If neither the per-image value nor the controller default is set for a
-// required build parameter, the build fails with a clear status condition.
+// BuildConfig specifies Proxmox infrastructure for running the Packer build
+// that produces the template.
 type BuildConfig struct {
 	// node overrides the Proxmox node on which to run the build.
-	// +optional
-	Node string `json:"node,omitempty"`
+	// +required
+	Node string `json:"node"`
 
 	// storagePool overrides the storage pool for the resulting template disk.
-	// +optional
-	StoragePool string `json:"storagePool,omitempty"`
+	// +required
+	StoragePool string `json:"storagePool"`
 
 	// isoStoragePool overrides the storage pool used for the installer ISO
-	// and cloud-init drives during the build.
+	// and cloud-init drives during the build. Defaults to storagePool if not set.
 	// +optional
-	ISOStoragePool string `json:"isoStoragePool,omitempty"`
+	ISOStoragePool string `json:"isoStoragePool,omitzero"`
 
 	// bridge overrides the network bridge for the builder VM during installation.
-	// +optional
-	Bridge string `json:"bridge,omitempty"`
+	// +required
+	Bridge string `json:"bridge"`
 }
 
 // RebuildPolicy controls when the controller rebuilds the template.
@@ -153,12 +150,12 @@ type RebuildPolicy struct {
 	// trigger determines what causes a rebuild.
 	// +kubebuilder:default=OnSpecChange
 	// +optional
-	Trigger RebuildPolicyTrigger `json:"trigger,omitempty"`
+	Trigger RebuildPolicyTrigger `json:"trigger,omitzero"`
 
 	// interval is the rebuild cadence when trigger is Periodic.
 	// Ignored for other triggers.
 	// +optional
-	Interval *metav1.Duration `json:"interval,omitempty"`
+	Interval *metav1.Duration `json:"interval,omitzero"`
 }
 
 // PVENodeImageStatus defines the observed state of PVENodeImage.
@@ -168,26 +165,26 @@ type PVENodeImageStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitzero"`
 
 	// templateVMID is the Proxmox VMID of the currently available template.
 	// Unset until the first successful build completes.
 	// +optional
-	TemplateVMID *int32 `json:"templateVMID,omitempty"`
+	TemplateVMID *int32 `json:"templateVMID,omitzero"`
 
 	// templateNode is the Proxmox node where the current template lives.
 	// +optional
-	TemplateNode string `json:"templateNode,omitempty"`
+	TemplateNode string `json:"templateNode,omitzero"`
 
 	// observedSpecHash is a hash of the spec fields that affect the built
 	// template. A mismatch between this value and the current spec hash
 	// indicates a rebuild is needed.
 	// +optional
-	ObservedSpecHash string `json:"observedSpecHash,omitempty"`
+	ObservedSpecHash string `json:"observedSpecHash,omitzero"`
 
 	// lastBuildTime records when the current template was built.
 	// +optional
-	LastBuildTime *metav1.Time `json:"lastBuildTime,omitempty"`
+	LastBuildTime *metav1.Time `json:"lastBuildTime,omitzero"`
 }
 
 // +kubebuilder:object:root=true

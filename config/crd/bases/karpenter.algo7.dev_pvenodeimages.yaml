@@ -88,9 +88,8 @@ spec:
                   rule: (has(self.url) && has(self.checksum) && !has(self.isoFile))
                     || (!has(self.url) && !has(self.checksum) && has(self.isoFile))
               buildConfig:
-                description: |-
-                  buildConfig provides per-image overrides for Proxmox build infrastructure.
-                  Empty fields inherit from the controller's configured defaults.
+                description: buildConfig specifies Proxmox infrastructure for the
+                  Packer build.
                 properties:
                   bridge:
                     description: bridge overrides the network bridge for the builder
@@ -99,7 +98,7 @@ spec:
                   isoStoragePool:
                     description: |-
                       isoStoragePool overrides the storage pool used for the installer ISO
-                      and cloud-init drives during the build.
+                      and cloud-init drives during the build. Defaults to storagePool if not set.
                     type: string
                   node:
                     description: node overrides the Proxmox node on which to run the
@@ -109,6 +108,10 @@ spec:
                     description: storagePool overrides the storage pool for the resulting
                       template disk.
                     type: string
+                required:
+                - bridge
+                - node
+                - storagePool
                 type: object
               distribution:
                 description: |-
@@ -173,6 +176,7 @@ spec:
                 type: string
             required:
             - baseImage
+            - buildConfig
             - distribution
             type: object
           status:

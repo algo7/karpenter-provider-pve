@@ -76,7 +76,7 @@ type PVENodeClassSpec struct {
 	// List operations; user-provided tags extend that set.
 	// +optional
 	// +listType=set
-	Tags []string `json:"tags,omitempty"`
+	Tags []string `json:"tags,omitzero"`
 }
 
 // NodeImageReference identifies a cluster-scoped PVENodeImage by name.
@@ -126,7 +126,7 @@ type PlacementTarget struct {
 	// zone is the Karpenter topology.kubernetes.io/zone label value this
 	// Proxmox node represents. If empty, the node name is used as the zone.
 	// +optional
-	Zone string `json:"zone,omitempty"`
+	Zone string `json:"zone,omitzero"`
 }
 
 // NetworkConfig specifies network settings applied to cloned VMs.
@@ -140,12 +140,12 @@ type NetworkConfig struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=4094
-	VLANTag *int32 `json:"vlanTag,omitempty"`
+	VLANTag *int32 `json:"vlanTag,omitzero"`
 
 	// firewall enables the Proxmox firewall on the VM network interface.
 	// +kubebuilder:default=false
 	// +optional
-	Firewall bool `json:"firewall,omitempty"`
+	Firewall bool `json:"firewall,omitzero"`
 }
 
 // PVENodeClassStatus defines the observed state of a PVENodeClass.
@@ -155,7 +155,7 @@ type PVENodeClassStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitzero"`
 }
 
 // +kubebuilder:object:root=true
