@@ -26,6 +26,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
@@ -113,15 +114,21 @@ func (r *PVENodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	log = log.WithValues("desiredHash", desiredHash[:12])
 
+	// statusChanged tracks whether any condition or status field was
+	// actually modified during this reconcile pass. When false, we skip
+	// the Status().Update() call entirely to avoid bumping resourceVersion
+	// and generating spurious watch events.
+	statusChanged := false
+
 	// Case 1: the current spec has already been successfully built.
 	// Nothing to do. Keep conditions accurate and return.
 	if image.Status.ObservedSpecHash == desiredHash && image.Status.TemplateVMID != nil {
-		log.V(1).Info("template is current")
-		setCondition(image, ConditionTypeBuilding, metav1.ConditionFalse,
-			ReasonBuildComplete, "Template is up to date")
-		setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionTrue,
-			ReasonTemplateCurrent, "Template matches current spec")
-		return ctrl.Result{}, r.updateStatus(ctx, image)
+		log.V(1).Info("Template is current")
+		statusChanged = setCondition(image, ConditionTypeBuilding, metav1.ConditionFalse,
+			ReasonBuildComplete, "Template is up to date") || statusChanged
+		statusChanged = setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionTrue,
+			ReasonTemplateCurrent, "Template matches current spec") || statusChanged
+		return ctrl.Result{}, r.updateStatusIfChanged(ctx, image, statusChanged)
 	}
 
 	// Look for a Job owned by this CR, labeled with the desired hash.
@@ -134,16 +141,16 @@ func (r *PVENodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Case 2: no Job exists yet for this spec. Need to start one.
 	if job == nil {
-		log.Info("no build job exists, would start one")
-		setCondition(image, ConditionTypeBuilding, metav1.ConditionTrue,
-			ReasonBuildPending, "Build Job not yet created")
-		setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionFalse,
-			ReasonSpecChanged, "Build in progress for new spec")
+		log.Info("No build Job exists, would start one")
+		statusChanged = setCondition(image, ConditionTypeBuilding, metav1.ConditionTrue,
+			ReasonBuildPending, "Build Job not yet created") || statusChanged
+		statusChanged = setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionFalse,
+			ReasonSpecChanged, "Build in progress for new spec") || statusChanged
 
 		// TODO(session B): actually create the ConfigMap and Job here.
 		// For now we just update status and requeue.
 
-		if err := r.updateStatus(ctx, image); err != nil {
+		if err := r.updateStatusIfChanged(ctx, image, statusChanged); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: requeueWhileBuilding}, nil
@@ -153,13 +160,13 @@ func (r *PVENodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Case 3: Job exists, still running. Surface that and wait.
 	if !isJobFinished(job) {
-		log.V(1).Info("build job in progress")
-		setCondition(image, ConditionTypeBuilding, metav1.ConditionTrue,
-			ReasonBuildInProgress, "Packer build is running")
-		setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionFalse,
-			ReasonBuildInProgress, "Build in progress")
+		log.V(1).Info("Build Job in progress")
+		statusChanged = setCondition(image, ConditionTypeBuilding, metav1.ConditionTrue,
+			ReasonBuildInProgress, "Packer build is running") || statusChanged
+		statusChanged = setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionFalse,
+			ReasonBuildInProgress, "Build in progress") || statusChanged
 
-		if err := r.updateStatus(ctx, image); err != nil {
+		if err := r.updateStatusIfChanged(ctx, image, statusChanged); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: requeueWhileBuilding}, nil
@@ -167,7 +174,7 @@ func (r *PVENodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Case 4: Job finished. Either it succeeded or it failed.
 	if jobSucceeded(job) {
-		log.Info("build job succeeded")
+		log.Info("Build Job succeeded")
 
 		// TODO(session B): extract VMID from the Pod's termination log
 		// and populate image.Status.TemplateVMID and TemplateNode.
@@ -175,25 +182,27 @@ func (r *PVENodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		image.Status.ObservedSpecHash = desiredHash
 		now := metav1.Now()
 		image.Status.LastBuildTime = &now
+		// Scalar status fields changed — force the update.
+		statusChanged = true
 
 		setCondition(image, ConditionTypeBuilding, metav1.ConditionFalse,
 			ReasonBuildComplete, "Build completed successfully")
 		setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionTrue,
 			ReasonBuildComplete, "Template built and available")
 
-		return ctrl.Result{}, r.updateStatus(ctx, image)
+		return ctrl.Result{}, r.updateStatusIfChanged(ctx, image, statusChanged)
 	}
 
 	// Job failed. Record the failure and stop requeueing — we wait for a
 	// spec change (which produces a new hash and starts a fresh Job) or
 	// for manual intervention.
-	log.Info("build job failed")
-	setCondition(image, ConditionTypeBuilding, metav1.ConditionFalse,
-		ReasonBuildFailed, "Packer build failed; see Job logs")
-	setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionFalse,
-		ReasonBuildFailed, "Most recent build failed")
+	log.Info("Build Job failed")
+	statusChanged = setCondition(image, ConditionTypeBuilding, metav1.ConditionFalse,
+		ReasonBuildFailed, "Packer build failed; see Job logs") || statusChanged
+	statusChanged = setCondition(image, ConditionTypeBuildSucceeded, metav1.ConditionFalse,
+		ReasonBuildFailed, "Most recent build failed") || statusChanged
 
-	return ctrl.Result{}, r.updateStatus(ctx, image)
+	return ctrl.Result{}, r.updateStatusIfChanged(ctx, image, statusChanged)
 }
 
 // SetupWithManager registers the reconciler with the manager. The Watches
@@ -216,10 +225,13 @@ func (r *PVENodeImageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// updateStatus writes the CR's current in-memory status to the API server.
-// Separated into its own method so every reconcile path can use the same
-// update logic without duplicating error handling.
-func (r *PVENodeImageReconciler) updateStatus(ctx context.Context, image *karpenterv1alpha1.PVENodeImage) error {
+// updateStatusIfChanged writes the CR's current in-memory status to the API
+// server only when changed is true. This avoids bumping resourceVersion (and
+// triggering spurious watch events) when the status is already up to date.
+func (r *PVENodeImageReconciler) updateStatusIfChanged(ctx context.Context, image *karpenterv1alpha1.PVENodeImage, changed bool) error {
+	if !changed {
+		return nil
+	}
 	if err := r.Status().Update(ctx, image); err != nil {
 		return fmt.Errorf("update status: %w", err)
 	}
@@ -308,37 +320,23 @@ func hashSpec(spec *karpenterv1alpha1.PVENodeImageSpec) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-// setCondition updates or appends a condition on the image's status. It
-// preserves LastTransitionTime semantics (only updated when Status changes).
+// setCondition updates or appends a condition on the image's status using the
+// stdlib apimeta.SetStatusCondition, which performs field-by-field comparison
+// and returns true only when the condition actually changed. This lets callers
+// skip the status update API call when nothing meaningful was modified.
 func setCondition(
 	image *karpenterv1alpha1.PVENodeImage,
 	condType string,
-	status metav1.ConditionStatus,
+	condStatus metav1.ConditionStatus,
 	reason, message string,
-) {
-	cond := metav1.Condition{
+) bool {
+	return apimeta.SetStatusCondition(&image.Status.Conditions, metav1.Condition{
 		Type:               condType,
-		Status:             status,
+		Status:             condStatus,
 		Reason:             reason,
 		Message:            message,
 		ObservedGeneration: image.Generation,
-		LastTransitionTime: metav1.Now(),
-	}
-
-	// Look for an existing condition of this type.
-	for i, existing := range image.Status.Conditions {
-		if existing.Type == condType {
-			// Preserve LastTransitionTime if status didn't change.
-			if existing.Status == status {
-				cond.LastTransitionTime = existing.LastTransitionTime
-			}
-			image.Status.Conditions[i] = cond
-			return
-		}
-	}
-
-	// No existing condition of this type; append.
-	image.Status.Conditions = append(image.Status.Conditions, cond)
+	})
 }
 
 // controllerNamespace returns the namespace the controller is running in.
