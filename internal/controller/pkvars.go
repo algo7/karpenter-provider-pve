@@ -26,7 +26,7 @@ import (
 	karpenterv1alpha1 "github.com/algo7/karpenter-provider-pve/api/v1alpha1"
 )
 
-//go:embed templates/ubuntu.pkr.hcl
+//go:embed templates/ubuntu/24.04/build.pkr.hcl
 var embeddedTemplates embed.FS
 
 // ubuntuTemplate returns the bytes of the embedded Ubuntu Packer template.
