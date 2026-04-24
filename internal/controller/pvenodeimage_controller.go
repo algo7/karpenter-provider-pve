@@ -338,14 +338,3 @@ func setCondition(
 		ObservedGeneration: image.Generation,
 	})
 }
-
-// controllerNamespace returns the namespace the controller is running in.
-// Build Jobs and their ConfigMaps live in this namespace.
-//
-// Session B note: this is a stub. The real implementation reads
-// POD_NAMESPACE (set via downward API) or /var/run/secrets/.../namespace.
-func controllerNamespace() string {
-	// TODO(session B): read POD_NAMESPACE env var, fall back to the
-	// service account namespace file.
-	return "karpenter"
-}
