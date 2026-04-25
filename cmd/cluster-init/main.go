@@ -26,7 +26,6 @@ proxmox_api_token_secret = "your-token-uuid-here"
 # ──────────────────────────────────────────────────────────────────────────────
 node                    = "pve-01"
 storage_pool            = "local-lvm"
-cloud_init_storage_pool = "local-lvm"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Boot ISO — provide EITHER iso_file OR (iso_url + iso_checksum), not both.

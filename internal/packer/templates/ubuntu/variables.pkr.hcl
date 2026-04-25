@@ -23,10 +23,6 @@ variable "storage_pool" {
   description = "Proxmox storage pool for VM disk."
 }
 
-variable "cloud_init_storage_pool" {
-  type    = string
-  description = "Proxmox storage pool for cloud-init disk."
-}
 
 variable "node" {
   type = string
