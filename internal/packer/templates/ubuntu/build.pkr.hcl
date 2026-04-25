@@ -18,6 +18,8 @@ build {
       "sudo cloud-init clean",
       "sudo rm -f /etc/cloud/cloud.cfg.d/subiquity-disable-cloudinit-networking.cfg",
       "sudo rm -f /etc/netplan/00-installer-config.yaml",
+      "sudo rm -f /etc/cloud/cloud.cfg.d/curtin-preserve-sources.cfg",
+      "sudo rm -f /etc/cloud/cloud.cfg.d/99-installer.cfg",
       "sudo sync"
     ]
   }

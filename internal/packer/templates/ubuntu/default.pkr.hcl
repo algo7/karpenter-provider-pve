@@ -12,6 +12,7 @@ source "proxmox-iso" "default" {
     iso_checksum             = var.iso_checksum
     iso_file     = var.iso_file
     iso_storage_pool = var.iso_storage_pool
+    iso_download_pve = true
     unmount = true
   }
 
@@ -40,7 +41,7 @@ source "proxmox-iso" "default" {
   ## OS and BIOS
   os      = "l26"
   bios    = "ovmf"
-  machine = "pc"
+  machine = "q35"
   efi_config {
     efi_storage_pool  = var.storage_pool
     pre_enrolled_keys = true
@@ -63,9 +64,9 @@ source "proxmox-iso" "default" {
   template_description = "Ubuntu 24.04 LTS Standard Server with 2C4T and 8GB RAM"
 
   # Cloud-init configuration
-  cloud_init              = true
-  cloud_init_storage_pool = var.cloud_init_storage_pool
-    cloud_init_disk_type = "scsi"
+  # cloud_init              = true
+  # cloud_init_storage_pool = var.cloud_init_storage_pool
+  # cloud_init_disk_type = "scsi"
   # http_directory          = "http"
   # http_port_min           = 12234
   # http_port_max           = 12234

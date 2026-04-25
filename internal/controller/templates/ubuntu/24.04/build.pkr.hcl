@@ -12,6 +12,7 @@ source "proxmox-iso" "ubuntu" {
     iso_checksum             = var.iso_checksum
     iso_file     = var.iso_file
     iso_storage_pool = try(var.iso_storage_pool, var.storage_pool)
+    iso_download_pve = true
     unmount = true
   }
 
@@ -63,10 +64,6 @@ source "proxmox-iso" "ubuntu" {
   template_name        = "ubuntu-24.04-lts-server-standard"
   template_description = "Ubuntu 24.04 LTS Standard Server with 2C4T and 8GB RAM"
 
-  # Cloud-init configuration
-  cloud_init              = true
-  cloud_init_storage_pool = try(var.cloud_init_storage_pool, var.storage_pool)
-  cloud_init_disk_type = "scsi"
 
   additional_iso_files {
     cd_files = [
@@ -191,7 +188,7 @@ build {
       # Remove subiquity's installer-time netplan config
       "sudo rm -f /etc/cloud/cloud.cfg.d/subiquity-disable-cloudinit-networking.cfg",
       "sudo rm -f /etc/netplan/00-installer-config.yaml",
-      # Reset cloud-init state so first-boot provisioning runs on clones
+      # Reset cloud-init state (empties /var/lib/cloud) so first-boot provisioning runs on clones
       "sudo cloud-init clean",
       # APT hygiene.
       "sudo apt-get -y autoremove --purge",

@@ -28,11 +28,6 @@ variable "storage_pool" {
   description = "Storage pool for the resulting template disk."
 }
 
-variable "cloud_init_storage_pool" {
-  type    = string
-  description = "Storage pool used for the cloud-init drive."
-}
-
 variable "iso_storage_pool" {
   type    = string
   description = "Storage pool used for the installer ISO."

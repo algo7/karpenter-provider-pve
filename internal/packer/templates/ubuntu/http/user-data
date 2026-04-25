@@ -4,13 +4,12 @@ autoinstall:
   refresh-installer:
     update: yes
   source:
-    id: 'ubuntu-server'
-    search_driver: true
+    id: 'ubuntu-server-minimal'
+    search_driver: false
   storage:
     layout:
       name: lvm
       sizing-policy: all
-
     swap:
       size: 0
   identity:
@@ -24,16 +23,9 @@ autoinstall:
   drivers:
     install: false
   packages:
-    - htop
     - qemu-guest-agent
-    - nload
-    - nala
     - cloud-init
-    - nethogs
-    - net-tools
-    - nala
   timezone: Etc/UTC
-  updates: all
   shutdown: reboot
   user-data:
     users:
