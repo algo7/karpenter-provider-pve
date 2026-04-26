@@ -1,4 +1,4 @@
-package packer
+package pcli
 
 import (
 	"crypto/sha256"
@@ -8,17 +8,21 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
+
+	t "github.com/algo7/karpenter-provider-pve/internal/packer"
 )
 
 // RunPacker extracts the embedded Packer binary, Proxmox plugin, and the named
 // template into a temporary directory, copies the user's pkrvars file into the
 // template dir as an auto-loaded var file, and runs Packer.
-func RunPacker(templateName, userVarFile string, args []string) error {
+func RunPacker(templateName, userVarFile, osVersion string) error {
 	fmt.Println("Running Packer with template:", templateName)
 	fmt.Println("Plese note that this can take a while as packer is configured to install all the available updates before creating the VM Template")
-
+	templateName = fmt.Sprintf("%s/%s", templateName, osVersion)
 	tmpDir, err := os.MkdirTemp("", "pve-packer-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
@@ -55,23 +59,22 @@ func RunPacker(templateName, userVarFile string, args []string) error {
 	}
 
 	// Extract template tree
-	templateDir := filepath.Join(tmpDir, "template")
-	srcDir := filepath.Join("templates", templateName)
-	if err := extractDir(srcDir, templateDir); err != nil {
+	// templateDir := filepath.Join(tmpDir, "template")
+	// srcDir := filepath.Join("templates", templateName)
+	srcDir := "templates"
+	if err := extractDir(srcDir, tmpDir); err != nil {
 		return fmt.Errorf("failed to extract template %q: %w", templateName, err)
 	}
 
 	// Copy user's pkrvars file into the template dir with an auto-load suffix
-	dst := filepath.Join(templateDir, "user.auto.pkrvars.hcl")
+	dst := filepath.Join(tmpDir, "user.auto.pkrvars.hcl")
 	if err := copyFile(userVarFile, dst, 0o600); err != nil {
 		return fmt.Errorf("copy user config: %w", err)
 	}
 
 	// Append template dir as final positional arg
-	cmdArgs := append(append([]string{}, args...), templateDir)
-
-	cmd := exec.Command(corePath, cmdArgs...)
-	cmd.Dir = templateDir
+	cmd := exec.Command(corePath, "build", ".")
+	cmd.Dir = tmpDir
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("PACKER_PLUGIN_PATH=%s", pluginRoot),
 	)
@@ -103,25 +106,51 @@ func extractFile(targetPath, embedPath string) error {
 	return os.WriteFile(targetPath, data, 0o755)
 }
 
-// extractDir walks srcDir inside packerTemplates and mirrors its contents to
-// destDir on disk. Directories are created with 0755, files written with 0644.
 func extractDir(srcDir, destDir string) error {
-	return fs.WalkDir(packerTemplates, srcDir, func(path string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(t.TemplateFs, srcDir, func(embeddedPath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(srcDir, path)
-		if err != nil {
-			return err
+
+		// Split the path to look for our target directories
+		segments := strings.Split(embeddedPath, "/")
+
+		// Default behavior: flatten everything to the file name
+		// We use path.Base instead of filepath.Base because embedded paths always use forward slashes, even on Windows
+		// even tho we don't support Windows, it's good to be consistent with the embedded path format
+		relPath := path.Base(embeddedPath)
+
+		// Search for "http" or "files" in the path hierarchy
+		// These are directories where the build.pkrvars.hcl expects to find files, so we want to preserve their structure
+		for i, seg := range segments {
+			if seg == "http" || seg == "files" {
+				// If found, preserve the path structure from this folder downward
+				relPath = strings.Join(segments[i:], "/")
+				break
+			}
 		}
-		target := filepath.Join(destDir, rel)
+
+		// Calculate final destination on the local OS
+		target := filepath.Join(destDir, filepath.FromSlash(relPath))
+
+		// Check if this item is part of the "http" or "files" tree we want to preserve
+		isPreservedTree := strings.HasPrefix(relPath, "http") || strings.HasPrefix(relPath, "files")
+
 		if d.IsDir() {
-			return os.MkdirAll(target, 0o755)
+			if isPreservedTree {
+				// Create the directory since it's part of the preserved structure
+				return os.MkdirAll(target, 0o755)
+			}
+			// Skip directories that we are flattening (e.g., 'ubuntu' or '24.04')
+			return nil
 		}
-		data, err := packerTemplates.ReadFile(path)
+
+		// Read and write the file
+		data, err := t.TemplateFs.ReadFile(embeddedPath)
 		if err != nil {
-			return fmt.Errorf("read embedded %s: %w", path, err)
+			return fmt.Errorf("read embedded %s: %w", embeddedPath, err)
 		}
+
 		return os.WriteFile(target, data, 0o644)
 	})
 }

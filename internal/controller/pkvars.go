@@ -17,23 +17,20 @@ limitations under the License.
 package controller
 
 import (
-	"embed"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	karpenterv1alpha1 "github.com/algo7/karpenter-provider-pve/api/v1alpha1"
+	t "github.com/algo7/karpenter-provider-pve/internal/packer"
 )
-
-//go:embed templates/ubuntu/24.04/build.pkr.hcl
-var embeddedTemplates embed.FS
 
 // ubuntuTemplate returns the bytes of the embedded Ubuntu Packer template.
 // Callers include this file in the Job's mounted ConfigMap so Packer can
 // reference it during the build.
 func ubuntuTemplate() ([]byte, error) {
-	return embeddedTemplates.ReadFile("templates/ubuntu.pkr.hcl")
+	return t.TemplateFs.ReadFile("templates/ubuntu.pkr.hcl")
 }
 
 // pkrvarsInput collects everything needed to render a pkrvars file for a

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/algo7/karpenter-provider-pve/internal/packer"
+	"github.com/algo7/karpenter-provider-pve/internal/packer/pcli"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +17,7 @@ const configTemplate = `# cluster-init configuration
 # ──────────────────────────────────────────────────────────────────────────────
 # Proxmox connection
 # ──────────────────────────────────────────────────────────────────────────────
+proxmox_node             = "pve"
 proxmox_api_url          = "https://pve.example.com:8006/api2/json"
 proxmox_api_token_id     = "packer@pve!bootstrap"
 proxmox_api_token_secret = "your-token-uuid-here"
@@ -24,8 +25,10 @@ proxmox_api_token_secret = "your-token-uuid-here"
 # ──────────────────────────────────────────────────────────────────────────────
 # Target Proxmox node & storage
 # ──────────────────────────────────────────────────────────────────────────────
-node                    = "pve-01"
-storage_pool            = "local-lvm"
+storage_pool            = "local"
+
+# Storage pool to store the downloaded ISO. Defaults to storage_pool if not set.
+# iso_storage_pool      = "local"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Boot ISO — provide EITHER iso_file OR (iso_url + iso_checksum), not both.
@@ -36,10 +39,13 @@ iso_file = "local:iso/ubuntu-24.04-live-server-amd64.iso"
 
 # Option 2: ISO downloaded by Packer at build time.
 iso_url          = "https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso"
-## iso_checksum can be a raw SHA256 hash or a URL with "file:" prefix pointing to a file containing the hash.
-## it can also be set to "none" to skip checksum verification, but that's not recommended.
+
+## iso_checksum can be a raw SHA256 hash or
+## a URL with "file:" prefix pointing to a file containing the hash.
+## Defaults to none.
 iso_checksum     = "file:https://releases.ubuntu.com/24.04/SHA256SUMS"
-iso_storage_pool = "local"
+
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Disk
@@ -51,14 +57,23 @@ disk_format = "qcow2"
 # but it doesn't have to be the same one used by the final cluster VMs.
 # ──────────────────────────────────────────────────────────────────────────────
 network_bridge = "vmbr0"
-network_vlan_tag = "20" # or leave blank for untagged
+
+# Optional VLAN tag for the network interface. Defaults to untagged if not set.
+# network_vlan_tag = "20"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# VM ID
+# VM Settings
 # ──────────────────────────────────────────────────────────────────────────────
-# ID for the Packer build VM as well as the final template. This should be an unused ID in your Proxmox cluster.
-# Default it 9999 if not set, but you can change it here by uncommenting and setting the value.
-# vm_id = 9000
+vm_id = 9000
+
+# IANA timezone
+timezone = "UTC"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Template settings
+# ──────────────────────────────────────────────────────────────────────────────
+template_name = "ubuntu-2404-live-server"
+template_description = "Ubuntu 24.04 LTS live server template for karpenter-provider-pve"
 `
 
 func main() {
@@ -108,6 +123,7 @@ func newBuildCmd() *cobra.Command {
 	var (
 		configPath   string
 		templateName string
+		osVersion    string
 	)
 
 	cmd := &cobra.Command{
@@ -120,13 +136,15 @@ func newBuildCmd() *cobra.Command {
 				return fmt.Errorf("config file: %w", err)
 			}
 
-			return packer.RunPacker(templateName, configPath, []string{"build"})
+			return pcli.RunPacker(templateName, configPath, osVersion)
 		},
 	}
 
 	cmd.Flags().StringVarP(&configPath, "config", "c", "", "path to pkrvars.hcl config file (required)")
 	cmd.Flags().StringVarP(&templateName, "template", "t", "ubuntu", "embedded template to build")
+	cmd.Flags().StringVarP(&osVersion, "os-version", "v", "", "OS version to build (optional, e.g. '24.04'; only needed if template supports multiple OS versions)")
 	_ = cmd.MarkFlagRequired("config")
+	_ = cmd.MarkFlagRequired("os-version")
 
 	return cmd
 }

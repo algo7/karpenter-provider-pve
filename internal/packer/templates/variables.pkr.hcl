@@ -42,12 +42,13 @@ variable "disk_format" {
 
 variable "iso_file" {
   type = string
+  default = ""
   description = "Pre-uploaded ISO reference (e.g., local:iso/ubuntu.iso). If set, iso_url and iso_checksum are ignored."
 }
 
 variable "iso_checksum" {
   type        = string
-  default     = ""
+  default     = "none"
   description = "Checksum of the ISO at iso_url."
 }
 
@@ -66,6 +67,7 @@ variable "network_bridge" {
 
 variable "network_vlan_tag" {
   type    = number
+  default = 0
   description = "VLAN tag for the network bridge."
 }
 
@@ -89,11 +91,13 @@ variable "template_description" {
 
 variable "distribution_type" {
   type        = string
+  default     = "rke2"
   description = "Kubernetes distribution family (rke2, k3s)."
 }
 
 variable "distribution_version" {
   type        = string
+  default     = "latest"
   description = "Kubernetes distribution version."
 }
 

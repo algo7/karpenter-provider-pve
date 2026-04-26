@@ -150,7 +150,7 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 build-cluster-init: sync-packer fmt vet ## Build cluster-init binary.
 	CGO_ENABLED=0 go build -trimpath \
 	-ldflags="-s -w \
-	-X 'github.com/algo7/karpenter-provider-pve/internal/packer.pluginVersion=${PACKER_PLUGIN_VER}' \
+	-X 'github.com/algo7/karpenter-provider-pve/internal/packer/pcli.pluginVersion=${PACKER_PLUGIN_VER}' \
 	" -o bin/cluster-init cmd/cluster-init/main.go
 
 
@@ -265,11 +265,11 @@ endef
 ##@ Dependencies - Packer
 
 # Versions
-PACKER_VER    ?= 1.15.1
+PACKER_VER    ?= 1.15.2
 PACKER_PLUGIN_VER    ?= 1.2.3
 
 # Directory Config
-PACKER_BIN_DIR ?= internal/packer/bin
+PACKER_BIN_DIR ?= internal/packer/pcli/bin
 PACKER_PLATFORMS := linux_amd64 darwin_amd64 darwin_arm64
 
 .PHONY: sync-packer

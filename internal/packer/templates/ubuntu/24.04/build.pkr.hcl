@@ -17,7 +17,7 @@ source "proxmox-iso" "ubuntu" {
   }
 
 
-  node         = var.node
+  node         = var.proxmox_node
   vm_id        = var.vm_id
   # Build-time SSH settings for Packer to connect to the VM and run provisioners. These should align with the user-data configuration to ensure Packer can connect successfully during the build
   ssh_username = "ubuntu" # align with the user-data in files/user-data
