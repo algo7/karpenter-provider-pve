@@ -82,7 +82,7 @@ func RunPacker(templateName, userVarFile, osVersion string) error {
 	}
 
 	// Append template dir as final positional arg
-	cmd := exec.Command(corePath, "build", ".")
+	cmd := exec.Command(corePath, "build", "-force", ".")
 	cmd.Dir = tmpDir
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("PACKER_PLUGIN_PATH=%s", pluginRoot),
