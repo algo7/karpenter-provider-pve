@@ -1,4 +1,4 @@
-# subiquity
+#cloud-config
 autoinstall:
   version: 1
   refresh-installer:

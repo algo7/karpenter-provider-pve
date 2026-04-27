@@ -112,23 +112,10 @@ func extractDir(srcDir, destDir string) error {
 			return err
 		}
 
-		// Split the path to look for our target directories
-		segments := strings.Split(embeddedPath, "/")
-
 		// Default behavior: flatten everything to the file name
 		// We use path.Base instead of filepath.Base because embedded paths always use forward slashes, even on Windows
 		// even tho we don't support Windows, it's good to be consistent with the embedded path format
 		relPath := path.Base(embeddedPath)
-
-		// Search for "http" or "files" in the path hierarchy
-		// These are directories where the build.pkrvars.hcl expects to find files, so we want to preserve their structure
-		for i, seg := range segments {
-			if seg == "http" || seg == "files" {
-				// If found, preserve the path structure from this folder downward
-				relPath = strings.Join(segments[i:], "/")
-				break
-			}
-		}
 
 		// Calculate final destination on the local OS
 		target := filepath.Join(destDir, filepath.FromSlash(relPath))

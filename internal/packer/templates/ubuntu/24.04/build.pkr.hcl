@@ -12,7 +12,7 @@ source "proxmox-iso" "ubuntu" {
     iso_checksum             = var.iso_checksum
     iso_file     = var.iso_file
     iso_storage_pool = try(var.iso_storage_pool, var.storage_pool)
-    iso_download_pve = true
+    iso_download_pve = var.iso_file == "" ? true : false
     unmount = true
   }
 
@@ -42,7 +42,7 @@ source "proxmox-iso" "ubuntu" {
   ## OS and BIOS
   os      = "l26"
   bios    = "ovmf"
-  machine = "pc"
+  machine = "q35"
   efi_config {
     efi_storage_pool  = var.storage_pool
     pre_enrolled_keys = true
@@ -67,8 +67,8 @@ source "proxmox-iso" "ubuntu" {
 
   additional_iso_files {
     cd_files = [
-      "./http/meta-data",
-      "./http/user-data"
+      "meta-data",
+      "user-data"
     ]
     type = "scsi"
     cd_label         = "cidata"
@@ -155,7 +155,7 @@ build {
   # Configure cloud-init for Proxmox's cidata delivery mechanism. Required
   # for cloned VMs to correctly pick up their user-data at first boot
   provisioner "file" {
-    source      = "files/99-pve.cfg"
+    source      = "99-pve.cfg"
     destination = "/tmp/99-pve.cfg"
   }
   provisioner "shell" {
@@ -207,8 +207,8 @@ build {
 
   # Write a build manifest the controller parses to extract the resulting
   # template's VMID
-  post-processor "manifest" {
-    output     = "/workspace/manifest.json"
-    strip_path = true
-  }
+  # post-processor "manifest" {
+  #   output     = "/workspace/manifest.json"
+  #   strip_path = true
+  # }
 }
