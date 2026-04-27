@@ -144,6 +144,7 @@ func newBuildCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&templateName, "template", "t", "ubuntu", "embedded template to build")
 	cmd.Flags().StringVarP(&osVersion, "os-version", "v", "", "OS version to build (optional, e.g. '24.04'; only needed if template supports multiple OS versions)")
 	_ = cmd.MarkFlagRequired("config")
+	_ = cmd.MarkFlagRequired("template")
 	_ = cmd.MarkFlagRequired("os-version")
 
 	return cmd

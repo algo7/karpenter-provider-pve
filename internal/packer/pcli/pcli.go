@@ -11,10 +11,12 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	t "github.com/algo7/karpenter-provider-pve/internal/packer"
 )
+
+// name of the "templates" directory in the embedded filesystem, which contains all the Packer template
+const embeddedRootDir string = "templates"
 
 // RunPacker extracts the embedded Packer binary, Proxmox plugin, and the named
 // template into a temporary directory, copies the user's pkrvars file into the
@@ -22,12 +24,12 @@ import (
 func RunPacker(templateName, userVarFile, osVersion string) error {
 	fmt.Println("Running Packer with template:", templateName)
 	fmt.Println("Plese note that this can take a while as packer is configured to install all the available updates before creating the VM Template")
-	templateName = fmt.Sprintf("%s/%s", templateName, osVersion)
+
 	tmpDir, err := os.MkdirTemp("", "pve-packer-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	// defer os.RemoveAll(tmpDir)
 
 	// Packer core binary
 	corePath := filepath.Join(tmpDir, "packer")
@@ -58,12 +60,19 @@ func RunPacker(templateName, userVarFile, osVersion string) error {
 		return fmt.Errorf("write plugin checksum: %w", err)
 	}
 
+	embeddedTemplateDir := fmt.Sprintf("%s/%s", templateName, osVersion)
+
 	// Extract template tree
-	// templateDir := filepath.Join(tmpDir, "template")
-	// srcDir := filepath.Join("templates", templateName)
-	srcDir := "templates"
+	// path.Base instead of filepath.Base because embedded paths always use forward slashes, even on Windows
+	// even tho we don't support Windows, it's good to be consistent with the embedded path format
+	srcDir := path.Join(embeddedRootDir, embeddedTemplateDir)
 	if err := extractDir(srcDir, tmpDir); err != nil {
-		return fmt.Errorf("failed to extract template %q: %w", templateName, err)
+		return fmt.Errorf("failed to extract template %q: %w", embeddedTemplateDir, err)
+	}
+
+	// Extract shared files: variables.pkr.hcl and packer.pkr.hcl
+	if err := extractDir(embeddedRootDir, tmpDir); err != nil {
+		return fmt.Errorf("failed to extract template shared files %q: %w", embeddedRootDir, err)
 	}
 
 	// Copy user's pkrvars file into the template dir with an auto-load suffix
@@ -112,25 +121,20 @@ func extractDir(srcDir, destDir string) error {
 			return err
 		}
 
-		// Default behavior: flatten everything to the file name
-		// We use path.Base instead of filepath.Base because embedded paths always use forward slashes, even on Windows
-		// even tho we don't support Windows, it's good to be consistent with the embedded path format
-		relPath := path.Base(embeddedPath)
-
-		// Calculate final destination on the local OS
-		target := filepath.Join(destDir, filepath.FromSlash(relPath))
-
-		// Check if this item is part of the "http" or "files" tree we want to preserve
-		isPreservedTree := strings.HasPrefix(relPath, "http") || strings.HasPrefix(relPath, "files")
-
 		if d.IsDir() {
-			if isPreservedTree {
-				// Create the directory since it's part of the preserved structure
-				return os.MkdirAll(target, 0o755)
+			// Don't skip the root directory we are starting from
+			if embeddedPath == srcDir {
+				return nil
 			}
-			// Skip directories that we are flattening (e.g., 'ubuntu' or '24.04')
-			return nil
+			return fs.SkipDir // Completely skip traversing into subdirectories
 		}
+
+		// Default behavior: flatten everything to the file name
+		// path.Base instead of filepath.Base because embedded paths always use forward slashes, even on Windows
+		// even tho we don't support Windows, it's good to be consistent with the embedded path format
+		basePath := path.Base(embeddedPath)
+		// Calculate final destination on the local OS
+		target := filepath.Join(destDir, filepath.FromSlash(basePath))
 
 		// Read and write the file
 		data, err := t.TemplateFs.ReadFile(embeddedPath)
